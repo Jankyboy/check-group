@@ -70,7 +70,19 @@ The app can be configured with `.github/checkgroup.yml`.
 
 Here's an example configuration for a monorepo project consist of a documentation site and a mobile app client:
 
+<!--
+  TODO(@tianhaoz95): add more comments into this configuration file and
+  make it like a instruction so that I can save some time on writing
+  documentation for the configuration options.
+-->
+
 ```yml
+# This field can customize the name this app shows up in the pull request
+# checks list. This is requested in #457 since the name "Check Group" is not
+# necessarily informative enough for engineers who knows less about this
+# workflow. Something like "Integration tests" or "Required tests" might be
+# better in some cases.
+custom_service_name: your_awesome_name # default to "Check Group"
 subprojects:
   - id: documentation
     paths:
@@ -107,6 +119,13 @@ Note: since I don't use GitHub Enterprise, the steps above might not fully refle
 ## Quick links
 
 - [Repository for testing](https://github.com/tianhaoz95/check-group-test)
+- [Repository for deploying to Vercel](https://github.com/tianhaoz95/check-group/tree/master)
+
+## Help us host the service
+
+To make sure that the service is reliable, I will need to host it on a paid service.
+
+You can help us out by sponsoring the service at [Buy Me a Coffee](https://www.buymeacoffee.com/jacksonzhou666). Really appreciate your support!
 
 ## License
 

@@ -1,3 +1,4 @@
+import { DefaultCheckId, ErrorCheckDetails, ErrorCheckSummary, ErrorCheckTitle, StartCheckDetails, StartCheckSummary, StartCheckTitle } from "../config";
 import {
   extractShaFromCheckRunContext,
   extractShaFromPullRequestContext,
@@ -16,7 +17,6 @@ import {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import type { CheckGroupConfig } from "../types";
 /* eslint-enable @typescript-eslint/no-unused-vars */
-import { CheckId } from "../config";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import type { Context } from "probot";
 /* eslint-enable @typescript-eslint/no-unused-vars */
@@ -33,14 +33,14 @@ import { satisfyExpectedChecks } from "../utils/satisfy_expected_checks";
 export class CheckGroup {
   pullRequestNumber: number;
   config: CheckGroupConfig;
-  context: Context;
+  context: Context<"check_run"> | Context<"pull_request">;
   sha: string;
   startTime: string;
 
   constructor(
     pullRequestNumber: number,
     config: CheckGroupConfig,
-    context: Context,
+    context: Context<"check_run"> | Context<"pull_request">,
     sha: string,
     startTime: string,
   ) {
@@ -74,35 +74,51 @@ export class CheckGroup {
         `Posted checks are: ${JSON.stringify(postedChecks)}`,
       );
       const conclusion = satisfyExpectedChecks(subprojs, postedChecks);
-      if (!(CheckId in postedChecks)) {
+      if (!(DefaultCheckId in postedChecks)) {
         this.context.log.info("First time run. Post starting check.");
-        await this.postStartingCheck();
+        await this.postStartingCheck(
+          this.config.customServiceName,
+          StartCheckTitle,
+          StartCheckSummary,
+          StartCheckDetails,
+        );
       }
       if (conclusion === "all_passing") {
         this.context.log.info("All expected checks passed.");
         await this.postPassingCheck(
+          this.config.customServiceName,
           generateSuccessTitle(subprojs, postedChecks),
           generateProgressSummary(subprojs, postedChecks),
-          generateProgressDetails(subprojs, postedChecks),
+          generateProgressDetails(subprojs, postedChecks, this.config),
         );
       } else if (conclusion === "has_failure") {
         this.context.log.info("Some of the expected checks failed.");
         await this.postFailingCheck(
+          this.config.customServiceName,
           generateFailingTitle(subprojs, postedChecks),
           generateProgressSummary(subprojs, postedChecks),
-          generateProgressDetails(subprojs, postedChecks),
+          generateProgressDetails(subprojs, postedChecks, this.config),
         );
       } else {
         this.context.log.info("Expected checks are still pending.");
         await this.postUpdatingCheck(
+          this.config.customServiceName,
           generateProgressTitle(subprojs, postedChecks),
           generateProgressSummary(subprojs, postedChecks),
-          generateProgressDetails(subprojs, postedChecks),
+          generateProgressDetails(subprojs, postedChecks, this.config),
         );
       }
     } catch {
       this.context.log.info("The app crashed.");
-      await this.postFailingCheck("Unknown Error", "test", "test");
+      // TODO(@tianhaoz95): Add a better error message. Consider using
+      // markdown import suggested by
+      // https://stackoverflow.com/questions/44678315/how-to-import-markdown-md-file-in-typescript
+      await this.postFailingCheck(
+        this.config.customServiceName,
+        ErrorCheckTitle,
+        ErrorCheckSummary,
+        ErrorCheckDetails,
+      );
     }
   }
 
@@ -120,7 +136,11 @@ export class CheckGroup {
       }),
     );
     const checkNames: Record<string, string> = {};
-    response.data.check_runs.forEach((checkRun) => {
+    response.data.check_runs.forEach((
+      /* eslint-disable */
+      checkRun: any
+      /* eslint-enable */
+    ) => {
       const conclusion = checkRun.conclusion ? checkRun.conclusion : "pending";
       checkNames[checkRun.name] = conclusion;
     });
@@ -138,7 +158,11 @@ export class CheckGroup {
       }),
     );
     const filenames: string[] = [];
-    response.data.forEach((pullRequestFile) => {
+    response.data.forEach((
+      /* eslint-disable */
+      pullRequestFile: any
+      /* eslint-enable */
+    ) => {
       filenames.push(pullRequestFile.filename);
     });
     return filenames;
@@ -147,15 +171,21 @@ export class CheckGroup {
   /**
    * Post a starting check
    */
-  async postStartingCheck(): Promise<void> {
+  async postStartingCheck(
+    name: string,
+    title: string,
+    summary: string,
+    details: string,
+  ): Promise<void> {
     /* eslint-disable */
     await createStatus(
       this.context,
       undefined,
       "queued",
-      "test",
-      "test",
-      "test",
+      name,
+      title,
+      summary,
+      details,
       this.startTime,
       this.sha,
     );
@@ -163,6 +193,7 @@ export class CheckGroup {
   }
 
   async postUpdatingCheck(
+    name: string,
     title: string,
     summary: string,
     details: string,
@@ -172,6 +203,7 @@ export class CheckGroup {
       this.context,
       undefined,
       "in_progress",
+      name,
       title,
       summary,
       details,
@@ -182,6 +214,7 @@ export class CheckGroup {
   }
 
   async postPassingCheck(
+    name: string,
     title: string,
     summary: string,
     details: string,
@@ -191,6 +224,7 @@ export class CheckGroup {
       this.context,
       "success",
       "completed",
+      name,
       title,
       summary,
       details,
@@ -201,6 +235,7 @@ export class CheckGroup {
   }
 
   async postFailingCheck(
+    name: string,
     title: string,
     summary: string,
     details: string,
@@ -210,6 +245,7 @@ export class CheckGroup {
       this.context,
       "failure",
       "completed",
+      name,
       title,
       summary,
       details,
